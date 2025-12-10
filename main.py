@@ -296,7 +296,7 @@ class Main(star.Star):
             yield event.plain_result(f"⚠️ 服务器 {alias} 已存在")
             return
 
-        # 测试连接
+        # 测试连接（使用线程池避免阻塞事件循环）
         client = TS3Client(
             host=host,
             query_port=port,
@@ -305,7 +305,9 @@ class Main(star.Star):
             virtual_server_id=vsid,
         )
 
-        if not client.connect():
+        # 同步操作放入线程池执行
+        connected = await asyncio.to_thread(client.connect)
+        if not connected:
             yield event.plain_result(
                 "❌ 无法连接到服务器\n"
                 "请检查地址、端口和凭据是否正确"
@@ -313,8 +315,8 @@ class Main(star.Star):
             return
 
         # 获取服务器名称
-        server_status = client.get_server_status()
-        client.disconnect()
+        server_status = await asyncio.to_thread(client.get_server_status)
+        await asyncio.to_thread(client.disconnect)
 
         if not server_status:
             yield event.plain_result("❌ 无法获取服务器信息")
