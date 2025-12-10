@@ -1,5 +1,5 @@
 name: astrbot_plugin_tsserver_relay
 desc: TeamSpeak 3 服务器监控 - 实时推送用户进出、服务器状态到群消息
 author: GEMILUXVII
-version: 1.0.7
+version: 1.0.8
 repo: "https://github.com/GEMILUXVII/astrbot_plugin_tsserver_relay"

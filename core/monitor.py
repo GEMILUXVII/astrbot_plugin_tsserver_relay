@@ -80,6 +80,7 @@ class TS3Monitor:
         reconnect_attempts = 0
         max_reconnect_attempts = 5
         initial_retry_delay = 30  # 首次连接失败后的重试间隔
+        long_sleep_minutes = 30  # 长睡眠模式等待时间（分钟）
 
         try:
             # 首次连接，失败则进入重试循环
@@ -88,8 +89,15 @@ class TS3Monitor:
                     break
                 reconnect_attempts += 1
                 if reconnect_attempts >= max_reconnect_attempts:
-                    logger.error(f"[{self.server_name}] 连接失败次数过多，监控停止")
-                    return
+                    # 进入长睡眠模式，而非永久停止
+                    logger.warning(
+                        f"[{self.server_name}] 连接失败次数过多，"
+                        f"进入长睡眠模式（{long_sleep_minutes}分钟后重试）"
+                    )
+                    if self._stop_event.wait(timeout=long_sleep_minutes * 60):
+                        return
+                    reconnect_attempts = 0  # 重置计数，继续尝试
+                    continue
                 logger.warning(
                     f"[{self.server_name}] 连接失败，{initial_retry_delay}秒后重试 "
                     f"({reconnect_attempts}/{max_reconnect_attempts})"
@@ -142,7 +150,7 @@ class TS3Monitor:
                                 try:
                                     self.on_client_join(self.server_name, client)
                                 except Exception as e:
-                                    logger.error(f"加入回调出错: {e}")
+                                    logger.error(f"加入回调出错: {e}", exc_info=True)
 
                     # 检测离开的客户端（加入待离开列表）
                     known_clids = set(self._known_clients.keys())
@@ -167,7 +175,7 @@ class TS3Monitor:
                             try:
                                 self.on_client_leave(self.server_name, client)
                             except Exception as e:
-                                logger.error(f"离开回调出错: {e}")
+                                logger.error(f"离开回调出错: {e}", exc_info=True)
 
                     # 检查是否需要推送状态
                     status_interval_seconds = self.status_interval * 60
@@ -181,18 +189,27 @@ class TS3Monitor:
                                 if status:
                                     self.on_status_tick(self.server_name, status)
                             except Exception as e:
-                                logger.error(f"状态推送回调出错: {e}")
+                                logger.error(f"状态推送回调出错: {e}", exc_info=True)
 
                     # 重置重连计数
                     reconnect_attempts = 0
 
                 except Exception as e:
-                    logger.error(f"[{self.server_name}] 监控循环出错: {e}")
+                    logger.error(f"[{self.server_name}] 监控循环出错: {e}", exc_info=True)
                     reconnect_attempts += 1
 
                     if reconnect_attempts >= max_reconnect_attempts:
-                        logger.error(f"[{self.server_name}] 重连次数过多，停止监控")
-                        break
+                        # 进入长睡眠模式，而非永久停止
+                        logger.warning(
+                            f"[{self.server_name}] 重连次数过多，"
+                            f"进入长睡眠模式（{long_sleep_minutes}分钟后重试）"
+                        )
+                        if self._stop_event.wait(timeout=long_sleep_minutes * 60):
+                            break
+                        reconnect_attempts = 0  # 重置计数，继续尝试
+                        # 重新连接
+                        if not self.client.reconnect():
+                            continue
 
                     # 尝试重连
                     logger.info(f"[{self.server_name}] 尝试重连 ({reconnect_attempts}/{max_reconnect_attempts})")
@@ -207,7 +224,7 @@ class TS3Monitor:
                     break
 
         except Exception as e:
-            logger.error(f"[{self.server_name}] 监控器异常: {e}")
+            logger.error(f"[{self.server_name}] 监控器异常: {e}", exc_info=True)
         finally:
             with self._lock:
                 self.running = False

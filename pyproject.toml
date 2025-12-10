@@ -1,6 +1,6 @@
 [project]
 name = "astrbot_plugin_tsserver_relay"
-version = "1.0.7"
+version = "1.0.8"
 description = "TeamSpeak 3 服务器监控插件"
 requires-python = ">=3.10"
 dependencies = ["ts3>=1.0.11"]

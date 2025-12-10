@@ -242,8 +242,13 @@ class TS3Client:
         )
 
     def __enter__(self) -> "TS3Client":
-        """上下文管理器入口"""
-        self.connect()
+        """上下文管理器入口
+
+        Raises:
+            ConnectionError: 连接失败时抛出
+        """
+        if not self.connect():
+            raise ConnectionError(f"无法连接到 TS3 服务器: {self.host}:{self.query_port}")
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
