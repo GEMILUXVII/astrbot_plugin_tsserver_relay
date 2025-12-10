@@ -56,6 +56,9 @@ class TS3Client:
     封装 ts3 库，提供连接管理和常用查询方法。
     """
 
+    # 默认超时时间（秒）
+    DEFAULT_TIMEOUT = 30
+
     def __init__(
         self,
         host: str,
@@ -63,6 +66,7 @@ class TS3Client:
         query_user: str,
         query_password: str,
         virtual_server_id: int = 1,
+        timeout: float = DEFAULT_TIMEOUT,
     ):
         """初始化客户端
 
@@ -72,12 +76,14 @@ class TS3Client:
             query_user: ServerQuery 用户名
             query_password: ServerQuery 密码
             virtual_server_id: 虚拟服务器 ID
+            timeout: 网络操作超时时间（秒），默认 30 秒
         """
         self.host = host
         self.query_port = query_port
         self.query_user = query_user
         self.query_password = query_password
         self.virtual_server_id = virtual_server_id
+        self.timeout = timeout
         self._connection: Any = None
 
     @property
@@ -96,7 +102,9 @@ class TS3Client:
             return False
 
         try:
-            self._connection = ts3.query.TS3Connection(self.host, self.query_port)
+            # 使用 timeout 参数避免连接时无限阻塞
+            self._connection = ts3.query.TS3Connection()
+            self._connection.open(self.host, self.query_port, timeout=self.timeout)
             self._connection.login(
                 client_login_name=self.query_user,
                 client_login_password=self.query_password,
@@ -139,7 +147,8 @@ class TS3Client:
             return []
 
         try:
-            resp = self._connection.clientlist()
+            # 使用 send 方法并传入 timeout 参数
+            resp = self._connection.send("clientlist", timeout=self.timeout)
             clients = []
             for client_data in resp.parsed:
                 client_type = int(client_data.get("client_type", 0))
@@ -170,7 +179,8 @@ class TS3Client:
             return []
 
         try:
-            resp = self._connection.channellist()
+            # 使用 send 方法并传入 timeout 参数
+            resp = self._connection.send("channellist", timeout=self.timeout)
             channels = []
             for channel_data in resp.parsed:
                 channels.append(
@@ -195,7 +205,8 @@ class TS3Client:
             return None
 
         try:
-            resp = self._connection.serverinfo()
+            # 使用 send 方法并传入 timeout 参数
+            resp = self._connection.send("serverinfo", timeout=self.timeout)
             if resp.parsed:
                 return resp.parsed[0]
             return None

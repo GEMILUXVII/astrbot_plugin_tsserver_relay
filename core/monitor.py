@@ -73,7 +73,7 @@ class TS3Monitor:
 
         # 防抖动
         self._pending_leaves: dict[int, tuple[ClientInfo, float]] = {}  # clid -> (info, leave_time)
-        self._leave_debounce_seconds = 5  # 用户离开后等待 5 秒确认
+        self._leave_debounce_seconds = 2  # 用户离开后等待 2 秒确认
 
     def _run(self) -> None:
         """监控主循环"""
