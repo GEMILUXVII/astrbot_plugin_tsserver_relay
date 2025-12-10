@@ -478,7 +478,7 @@ class Main(star.Star):
             yield event.plain_result(f"⚠️ 服务器 {alias} 不存在")
             return
 
-        # 获取实时状态
+        # 获取实时状态（使用线程池避免阻塞事件循环）
         client = TS3Client(
             host=server_info.host,
             query_port=server_info.query_port,
@@ -487,19 +487,21 @@ class Main(star.Star):
             virtual_server_id=server_info.virtual_server_id,
         )
 
-        if not client.connect():
+        # 同步操作放入线程池执行
+        connected = await asyncio.to_thread(client.connect)
+        if not connected:
             yield event.plain_result(f"❌ 无法连接到服务器 {alias}")
             return
 
         try:
-            status = client.get_server_status()
+            status = await asyncio.to_thread(client.get_server_status)
             if status:
                 notification = self.notifier.build_status_notification(alias, status)
                 yield event.plain_result(notification)
             else:
                 yield event.plain_result(f"❌ 无法获取服务器 {alias} 的状态")
         finally:
-            client.disconnect()
+            await asyncio.to_thread(client.disconnect)
 
     @ts.command("join")
     @filter.permission_type(filter.PermissionType.ADMIN)
