@@ -3,6 +3,12 @@
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from ..utils.constants import (
+    DEFAULT_QUERY_PORT,
+    DEFAULT_STATUS_INTERVAL,
+    DEFAULT_VIRTUAL_SERVER_ID,
+)
+
 
 @dataclass
 class ServerInfo:
@@ -24,11 +30,11 @@ class ServerInfo:
     host: str
     query_user: str
     query_password: str
-    query_port: int = 10011
-    virtual_server_id: int = 1
+    query_port: int = DEFAULT_QUERY_PORT
+    virtual_server_id: int = DEFAULT_VIRTUAL_SERVER_ID
     added_by: str = ""
     added_time: str = ""
-    status_interval: int = 60  # 默认 60 分钟
+    status_interval: int = DEFAULT_STATUS_INTERVAL
 
     def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
@@ -42,9 +48,10 @@ class ServerInfo:
             host=data.get("host", ""),
             query_user=data.get("query_user", ""),
             query_password=data.get("query_password", ""),
-            query_port=data.get("query_port", 10011),
-            virtual_server_id=data.get("virtual_server_id", 1),
+            query_port=data.get("query_port", DEFAULT_QUERY_PORT),
+            virtual_server_id=data.get("virtual_server_id", DEFAULT_VIRTUAL_SERVER_ID),
             added_by=data.get("added_by", ""),
             added_time=data.get("added_time", ""),
-            status_interval=data.get("status_interval", 60),
+            status_interval=data.get("status_interval", DEFAULT_STATUS_INTERVAL),
         )
+

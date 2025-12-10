@@ -8,6 +8,7 @@ from astrbot.api import logger
 from astrbot.api.event import MessageEventResult
 from astrbot.api.message_components import AtAll, Plain
 
+from ..utils.constants import format_duration
 from .ts3_client import ClientInfo, ServerStatus
 
 if TYPE_CHECKING:
@@ -111,17 +112,8 @@ class Notifier:
 
         time_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp))
 
-        # 格式化运行时间
-        uptime = status.uptime
-        days = uptime // 86400
-        hours = (uptime % 86400) // 3600
-        minutes = (uptime % 3600) // 60
-        if days > 0:
-            uptime_str = f"{days}天{hours}小时{minutes}分钟"
-        elif hours > 0:
-            uptime_str = f"{hours}小时{minutes}分钟"
-        else:
-            uptime_str = f"{minutes}分钟"
+        # 格式化运行时间（复用 utils 中的函数）
+        uptime_str = format_duration(status.uptime)
 
         # 构建在线用户列表
         if status.clients:

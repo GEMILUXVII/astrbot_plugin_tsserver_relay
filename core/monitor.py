@@ -77,9 +77,26 @@ class TS3Monitor:
 
     def _run(self) -> None:
         """监控主循环"""
+        reconnect_attempts = 0
+        max_reconnect_attempts = 5
+        initial_retry_delay = 30  # 首次连接失败后的重试间隔
+
         try:
-            if not self.client.connect():
-                logger.error(f"[{self.server_name}] 无法连接到服务器")
+            # 首次连接，失败则进入重试循环
+            while not self._stop_flag:
+                if self.client.connect():
+                    break
+                reconnect_attempts += 1
+                if reconnect_attempts >= max_reconnect_attempts:
+                    logger.error(f"[{self.server_name}] 连接失败次数过多，监控停止")
+                    return
+                logger.warning(
+                    f"[{self.server_name}] 连接失败，{initial_retry_delay}秒后重试 "
+                    f"({reconnect_attempts}/{max_reconnect_attempts})"
+                )
+                time.sleep(initial_retry_delay)
+
+            if self._stop_flag:
                 return
 
             with self._lock:
@@ -96,8 +113,8 @@ class TS3Monitor:
             # 设置首次状态推送时间
             self._last_status_time = time.time()
 
+            # 重置重连计数
             reconnect_attempts = 0
-            max_reconnect_attempts = 5
 
             while not self._stop_flag:
                 try:
