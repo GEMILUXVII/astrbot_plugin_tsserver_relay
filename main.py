@@ -12,7 +12,7 @@ from astrbot.api import logger, star
 from astrbot.api.event import AstrMessageEvent, filter
 
 from .core import TS3_AVAILABLE, Notifier, TS3Client, TS3Monitor
-from .core.ts3_client import ClientInfo
+from .core.ts3_client import ClientInfo, ServerStatus
 from .models import ServerInfo
 from .storage import DataManager
 
@@ -221,8 +221,13 @@ class Main(star.Star):
         notification = self.notifier.build_leave_notification(server_name, client)
         self._schedule_notification(leave_subscribers, notification)
 
-    def _on_status_tick(self, server_name: str) -> None:
-        """状态推送回调"""
+    def _on_status_tick(self, server_name: str, status: "ServerStatus") -> None:
+        """状态推送回调
+
+        Args:
+            server_name: 服务器别名
+            status: 服务器状态（由 Monitor 传入，复用现有连接获取）
+        """
         sub_configs = self.data.get_all_subscription_configs(server_name)
         if not sub_configs:
             return
@@ -237,27 +242,9 @@ class Main(star.Star):
         if not status_subscribers:
             return
 
-        # 获取服务器状态
-        server_info = self.data.get_server(server_name)
-        if not server_info:
-            return
-
-        client = TS3Client(
-            host=server_info.host,
-            query_port=server_info.query_port,
-            query_user=server_info.query_user,
-            query_password=server_info.query_password,
-            virtual_server_id=server_info.virtual_server_id,
-        )
-
-        try:
-            if client.connect():
-                status = client.get_server_status()
-                if status:
-                    notification = self.notifier.build_status_notification(server_name, status)
-                    self._schedule_notification(status_subscribers, notification)
-        finally:
-            client.disconnect()
+        # 直接使用传入的状态，无需创建新连接
+        notification = self.notifier.build_status_notification(server_name, status)
+        self._schedule_notification(status_subscribers, notification)
 
     # ==================== 命令组 ====================
 

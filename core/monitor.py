@@ -6,7 +6,7 @@ from threading import Lock, Thread
 
 from astrbot.api import logger
 
-from .ts3_client import TS3_AVAILABLE, ClientInfo, TS3Client
+from .ts3_client import TS3_AVAILABLE, ClientInfo, ServerStatus, TS3Client
 
 
 class TS3Monitor:
@@ -27,7 +27,7 @@ class TS3Monitor:
         poll_interval: int = 10,
         on_client_join: Callable[[str, ClientInfo], None] | None = None,
         on_client_leave: Callable[[str, ClientInfo], None] | None = None,
-        on_status_tick: Callable[[str], None] | None = None,
+        on_status_tick: Callable[[str, ServerStatus], None] | None = None,
     ):
         """初始化监控器
 
@@ -157,7 +157,10 @@ class TS3Monitor:
                         logger.info(f"[{self.server_name}] 触发状态推送")
                         if self.on_status_tick:
                             try:
-                                self.on_status_tick(self.server_name)
+                                # 复用现有连接获取状态
+                                status = self.client.get_server_status()
+                                if status:
+                                    self.on_status_tick(self.server_name, status)
                             except Exception as e:
                                 logger.error(f"状态推送回调出错: {e}")
 
