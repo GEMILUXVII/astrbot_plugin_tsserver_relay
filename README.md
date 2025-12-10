@@ -48,7 +48,7 @@ AstrBot TeamSpeak 3 服务器监控插件，支持多服务器监控、用户进
 - **权限控制**：添加/删除服务器需管理员权限
 - **状态查询**：随时查看服务器实时状态
 
-## 安装与配置
+## 插件安装
 
 1. **安装依赖**
 
@@ -75,31 +75,31 @@ AstrBot TeamSpeak 3 服务器监控插件，支持多服务器监控、用户进
 
    在 WebUI 重载插件，或直接重启 AstrBot。
 
-4. **配置 TeamSpeak 防洪白名单**
+## 配置 TeamSpeak 防洪白名单
 
-   > [!WARNING]
-   > **重要：配置 ServerQuery 白名单**
-   >
-   > 本插件会以较高的频率与 TeamSpeak 服务器的 ServerQuery 端口通信。为防止被 TeamSpeak 的防洪（Anti-Flood）机制误判为攻击，**必须**将管理工具的 IP 地址加入服务器的白名单。
+> [!WARNING]
+> **重要：配置 ServerQuery 白名单**
+>
+> 本插件会以较高的频率与 TeamSpeak 服务器的 ServerQuery 端口通信。为防止被 TeamSpeak 的防洪（Anti-Flood）机制误判为攻击，**必须**将管理工具的 IP 地址加入服务器的白名单。
 
-   进入每个 TeamSpeak 服务器的数据目录，创建或编辑 `query_ip_allowlist.txt` 文件：
+进入每个 TeamSpeak 服务器的数据目录，创建或编辑 `query_ip_allowlist.txt` 文件：
 
-   ```
-   127.0.0.1
-   ::1
-   172.16.0.0/12  # 覆盖 Docker 默认的内部网络地址范围
-   ```
+```
+127.0.0.1
+::1
+172.16.0.0/12  # 覆盖 Docker 默认的内部网络地址范围
+```
 
-   > [!CAUTION]
-   > **必须重启 TeamSpeak 服务！**
-   >
-   > 这是最容易被忽略但至关重要的一步。白名单配置必须在重启后才能生效。
+> [!CAUTION]
+> **必须重启 TeamSpeak 服务！**
+>
+> 这是最容易被忽略但至关重要的一步。白名单配置必须在重启后才能生效。
 
-   ```bash
-   # 进入 TeamSpeak 项目目录
-   cd /path/to/your/teamspeak_project
-   docker-compose restart
-   ```
+```bash
+# 进入 TeamSpeak 项目目录
+cd /path/to/your/teamspeak_project
+docker-compose restart
+```
 
 ## 命令列表
 
