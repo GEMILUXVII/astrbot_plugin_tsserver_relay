@@ -88,8 +88,10 @@ class Main(star.Star):
             except asyncio.CancelledError:
                 pass
 
+        # 使用 run_in_executor 避免 thread.join 阻塞事件循环
+        loop = asyncio.get_running_loop()
         for monitor in self.monitors.values():
-            monitor.stop()
+            await loop.run_in_executor(None, monitor.stop)
         self.monitors.clear()
         self.data.save()
         logger.info("TeamSpeak 监控插件已停止")
