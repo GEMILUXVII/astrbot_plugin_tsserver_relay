@@ -6,7 +6,6 @@
 import asyncio
 import time
 from dataclasses import dataclass
-from queue import Empty, Queue
 
 from astrbot.api import logger, star
 from astrbot.api.event import AstrMessageEvent, filter
@@ -55,8 +54,8 @@ class Main(star.Star):
         self.notifier = Notifier(context)
         self.monitors: dict[str, TS3Monitor] = {}
 
-        # 通知队列
-        self._notification_queue: Queue[PendingNotification] = Queue()
+        # 通知队列（使用 asyncio.Queue 实现零延迟异步处理）
+        self._notification_queue: asyncio.Queue[PendingNotification] | None = None
         self._queue_processor_task: asyncio.Task | None = None
 
     async def initialize(self) -> None:
@@ -69,6 +68,9 @@ class Main(star.Star):
         if not TS3_AVAILABLE:
             logger.error("ts3 库未安装，TeamSpeak 监控插件无法正常工作")
             return
+
+        # 初始化 asyncio.Queue（必须在事件循环中创建）
+        self._notification_queue = asyncio.Queue()
 
         # 启动通知队列处理任务
         self._queue_processor_task = asyncio.create_task(self._process_notification_queue())
@@ -131,34 +133,28 @@ class Main(star.Star):
             del self.monitors[server_name]
 
     async def _process_notification_queue(self) -> None:
-        """处理通知队列的后台任务"""
+        """处理通知队列的后台任务（使用 asyncio.Queue 实现零延迟）"""
         MAX_RETRIES = 5
         while True:
             try:
-                await asyncio.sleep(1)
+                # 直接 await，无需轮询
+                item = await self._notification_queue.get()
 
-                pending_items: list[PendingNotification] = []
-                while True:
-                    try:
-                        item = self._notification_queue.get_nowait()
-                        pending_items.append(item)
-                    except Empty:
-                        break
-
-                for item in pending_items:
-                    try:
-                        await self.notifier.send_to_subscribers(
-                            item.subscriber_settings, item.message
+                try:
+                    await self.notifier.send_to_subscribers(
+                        item.subscriber_settings, item.message
+                    )
+                except Exception as e:
+                    item.retry_count += 1
+                    if item.retry_count < MAX_RETRIES:
+                        await self._notification_queue.put(item)
+                        logger.warning(
+                            f"发送通知失败，将重试 ({item.retry_count}/{MAX_RETRIES}): {e}"
                         )
-                    except Exception as e:
-                        item.retry_count += 1
-                        if item.retry_count < MAX_RETRIES:
-                            self._notification_queue.put(item)
-                            logger.warning(
-                                f"发送通知失败，将重试 ({item.retry_count}/{MAX_RETRIES}): {e}"
-                            )
-                        else:
-                            logger.error(f"发送通知失败，已达最大重试次数: {e}")
+                    else:
+                        logger.error(f"发送通知失败，已达最大重试次数: {e}")
+                finally:
+                    self._notification_queue.task_done()
 
             except asyncio.CancelledError:
                 break
@@ -168,20 +164,25 @@ class Main(star.Star):
     def _schedule_notification(
         self, subscriber_settings: dict[str, bool], message: str
     ) -> None:
-        """安全地调度通知发送"""
+        """安全地调度通知发送（从监控线程调用）"""
         if not subscriber_settings:
             return
 
+        if not self._notification_queue:
+            logger.warning("通知队列未初始化")
+            return
+
+        notification = PendingNotification(
+            subscriber_settings=subscriber_settings, message=message
+        )
+
         if self.loop and self.loop.is_running():
-            asyncio.run_coroutine_threadsafe(
-                self.notifier.send_to_subscribers(subscriber_settings, message),
-                self.loop,
+            # 使用 call_soon_threadsafe 将通知安全地放入 asyncio.Queue
+            self.loop.call_soon_threadsafe(
+                self._notification_queue.put_nowait, notification
             )
         else:
-            logger.warning("事件循环暂时不可用，通知已加入队列")
-            self._notification_queue.put(
-                PendingNotification(subscriber_settings=subscriber_settings, message=message)
-            )
+            logger.warning("事件循环不可用，无法发送通知")
 
     def _on_client_join(self, server_name: str, client: ClientInfo) -> None:
         """用户加入回调"""
