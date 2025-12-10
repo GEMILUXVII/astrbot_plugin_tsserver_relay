@@ -216,11 +216,13 @@ class TS3Client:
         clients = self.get_client_list()
         channels = self.get_channel_list()
 
+        # 使用过滤后的客户端列表长度，而非服务器报告的数值
+        # 因为服务器报告的数值包含 ServerQuery 连接，可能有多个
         return ServerStatus(
             name=server_info.get("virtualserver_name", "Unknown"),
             platform=server_info.get("virtualserver_platform", "Unknown"),
             version=server_info.get("virtualserver_version", "Unknown"),
-            clients_online=int(server_info.get("virtualserver_clientsonline", 0)) - 1,  # 减去 ServerQuery
+            clients_online=len(clients),  # 使用实际过滤后的客户端数量
             max_clients=int(server_info.get("virtualserver_maxclients", 0)),
             channels_online=int(server_info.get("virtualserver_channelsonline", 0)),
             uptime=int(server_info.get("virtualserver_uptime", 0)),
