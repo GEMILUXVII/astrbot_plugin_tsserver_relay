@@ -2,7 +2,7 @@
 
 import time
 from collections.abc import Callable
-from threading import Lock, Thread
+from threading import Event, Lock, Thread
 
 from astrbot.api import logger
 
@@ -63,7 +63,7 @@ class TS3Monitor:
 
         # 状态
         self.running = False
-        self._stop_flag = False
+        self._stop_event = Event()  # 用于可中断睡眠
         self._thread: Thread | None = None
         self._lock = Lock()
 
@@ -83,7 +83,7 @@ class TS3Monitor:
 
         try:
             # 首次连接，失败则进入重试循环
-            while not self._stop_flag:
+            while not self._stop_event.is_set():
                 if self.client.connect():
                     break
                 reconnect_attempts += 1
@@ -94,9 +94,11 @@ class TS3Monitor:
                     f"[{self.server_name}] 连接失败，{initial_retry_delay}秒后重试 "
                     f"({reconnect_attempts}/{max_reconnect_attempts})"
                 )
-                time.sleep(initial_retry_delay)
+                # 可中断睡眠：如果 _stop_event 被设置，立即返回
+                if self._stop_event.wait(timeout=initial_retry_delay):
+                    return
 
-            if self._stop_flag:
+            if self._stop_event.is_set():
                 return
 
             with self._lock:
@@ -116,7 +118,7 @@ class TS3Monitor:
             # 重置重连计数
             reconnect_attempts = 0
 
-            while not self._stop_flag:
+            while not self._stop_event.is_set():
                 try:
                     # 获取当前客户端列表
                     current_clients = self.client.get_client_list()
@@ -195,11 +197,14 @@ class TS3Monitor:
                     # 尝试重连
                     logger.info(f"[{self.server_name}] 尝试重连 ({reconnect_attempts}/{max_reconnect_attempts})")
                     if not self.client.reconnect():
-                        time.sleep(30)  # 重连失败，等待 30 秒后重试
+                        # 可中断睡眠：重连失败，等待后重试
+                        if self._stop_event.wait(timeout=30):
+                            break
                         continue
 
-                # 等待下一次轮询
-                time.sleep(self.poll_interval)
+                # 可中断睡眠：等待下一次轮询
+                if self._stop_event.wait(timeout=self.poll_interval):
+                    break
 
         except Exception as e:
             logger.error(f"[{self.server_name}] 监控器异常: {e}")
@@ -222,19 +227,19 @@ class TS3Monitor:
         if self.running:
             return True
 
-        self._stop_flag = False
+        self._stop_event.clear()  # 重置停止事件
         self._thread = Thread(target=self._run, daemon=True)
         self._thread.start()
         return True
 
     def stop(self) -> None:
         """停止监控"""
-        self._stop_flag = True
+        self._stop_event.set()  # 设置停止事件，唤醒所有 wait()
         with self._lock:
             self.running = False
 
         if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=10.0)
+            self._thread.join(timeout=5.0)  # 现在线程应该很快响应
 
         self._known_clients.clear()
         self._pending_leaves.clear()
